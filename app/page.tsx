@@ -1,7 +1,7 @@
 
 "use client"
 
-import { Formik, Form } from "formik"
+import { Formik, Form, type FormikErrors } from "formik"
 import * as Yup from "yup"
 
 import {
@@ -76,29 +76,7 @@ const AttendanceSchema = Yup.object({
       .required(),
     onlyRequired: Yup.boolean().required(),
   }),
-}).test(
-  "leaves-within-delta",
-  "Total leaves cannot exceed classes you actually missed.",
-  function (value) {
-    if (!value) return true
-    const missed = Math.max(0, value.totalClasses - value.attendedClasses)
-    const totalLeaves =
-      (value.medicalLeaves?.leaves ?? 0) + (value.dutyLeaves?.leaves ?? 0)
-
-    if (totalLeaves <= missed) {
-      return true
-    }
-
-    this.createError({
-      path: "medicalLeaves.leaves",
-      message: `Total leaves (${totalLeaves}) exceed missed classes (${missed}).`,
-    })
-    return this.createError({
-      path: "dutyLeaves.leaves",
-      message: `Total leaves (${totalLeaves}) exceed missed classes (${missed}).`,
-    })
-  }
-)
+})
 
 const initialValues: AttendanceFormValues = {
   totalClasses: 0,
@@ -126,6 +104,28 @@ const leaveSections: Array<{
       "Duty leaves are applied outside attended classes and boost your percentage after the criterion.",
   },
 ] as const
+
+const validateAttendance = (
+  values: AttendanceFormValues
+): FormikErrors<AttendanceFormValues> => {
+  const errors: FormikErrors<AttendanceFormValues> = {}
+  const missed = Math.max(0, values.totalClasses - values.attendedClasses)
+  const totalLeaves = values.medicalLeaves.leaves + values.dutyLeaves.leaves
+
+  if (totalLeaves > missed) {
+    const message = `Total leaves (${totalLeaves}) exceed missed classes (${missed}).`
+    errors.medicalLeaves = {
+      ...(errors.medicalLeaves ?? {}),
+      leaves: message,
+    }
+    errors.dutyLeaves = {
+      ...(errors.dutyLeaves ?? {}),
+      leaves: message,
+    }
+  }
+
+  return errors
+}
 
 type LeaveComputationResult = {
   applied: number
@@ -211,8 +211,18 @@ export default function Home() {
         initialValues={initialValues}
         validationSchema={AttendanceSchema}
         onSubmit={() => void 0}
+        validateOnMount
+        validate={validateAttendance}
       >
-        {({ values, setFieldValue, errors, touched }) => {
+        {({
+          values,
+          setFieldValue,
+          errors,
+          touched,
+          handleBlur,
+          setFieldTouched,
+          isValid,
+        }) => {
           const currentPercentage =
             values.totalClasses > 0
               ? (values.attendedClasses / values.totalClasses) * 100
@@ -258,6 +268,24 @@ export default function Home() {
             effectiveAttended,
             values.targetPercentage
           )
+          const effectiveAttendanceColor =
+            effectivePercentage >= values.targetPercentage
+              ? "text-emerald-500"
+              : "text-destructive"
+          const isAttendCard = classesToAttend > 0
+          const cardValue = isAttendCard ? classesToAttend : classesToBunk
+          const cardTitle = isAttendCard ? "Need to Attend" : "Safe to Bunk"
+          const cardBorder = isAttendCard
+            ? "border-red-500/40 bg-red-500/10"
+            : "border-green-500/40 bg-green-500/10"
+          const cardValueColor = isAttendCard ? "text-red-500" : "text-green-500"
+          const cardDescription = isAttendCard
+            ? `Attend ${cardValue} more class${
+                cardValue === 1 ? "" : "es"
+              } consecutively to hit ${values.targetPercentage}%.`
+            : `You can safely skip ${cardValue} class${
+                cardValue === 1 ? "" : "es"
+              } without falling below ${values.targetPercentage}%.`
 
           return (
             <div className="grid gap-6 lg:grid-cols-[3fr,2fr]">
@@ -275,15 +303,21 @@ export default function Home() {
                       <Label htmlFor="totalClasses">Total Classes</Label>
                       <Input
                         id="totalClasses"
+                        name="totalClasses"
                         type="number"
                         min={0}
                         value={values.totalClasses}
-                        onChange={(event) =>
-                          setFieldValue(
-                            "totalClasses",
+                        onBlur={handleBlur}
+                        onChange={(event) => {
+                          const nextTotal = Math.max(
+                            0,
                             Number(event.target.value) || 0
                           )
-                        }
+                          setFieldValue("totalClasses", nextTotal)
+                          if (values.attendedClasses > nextTotal) {
+                            setFieldValue("attendedClasses", nextTotal)
+                          }
+                        }}
                       />
                       {touched.totalClasses && errors.totalClasses ? (
                         <p className="text-sm text-destructive">
@@ -296,15 +330,21 @@ export default function Home() {
                       <Label htmlFor="attendedClasses">Attended Classes</Label>
                       <Input
                         id="attendedClasses"
+                        name="attendedClasses"
                         type="number"
                         min={0}
                         value={values.attendedClasses}
-                        onChange={(event) =>
-                          setFieldValue(
-                            "attendedClasses",
+                        onBlur={handleBlur}
+                        onChange={(event) => {
+                          const nextAttended = Math.max(
+                            0,
                             Number(event.target.value) || 0
                           )
-                        }
+                          setFieldValue(
+                            "attendedClasses",
+                            Math.min(nextAttended, values.totalClasses)
+                          )
+                        }}
                       />
                       {touched.attendedClasses && errors.attendedClasses ? (
                         <p className="text-sm text-destructive">
@@ -319,10 +359,12 @@ export default function Home() {
                       </Label>
                       <Input
                         id="targetPercentage"
+                        name="targetPercentage"
                         type="number"
                         min={1}
                         max={100}
                         value={values.targetPercentage}
+                        onBlur={handleBlur}
                         onChange={(event) =>
                           setFieldValue(
                             "targetPercentage",
@@ -375,9 +417,11 @@ export default function Home() {
                             </Label>
                             <Input
                               id={`${section.key}-leaves`}
+                              name={`${section.key}.leaves`}
                               type="number"
                               min={0}
                               value={leaveValues.leaves}
+                              onBlur={handleBlur}
                               onChange={(event) =>
                                 setFieldValue(
                                   `${section.key}.leaves`,
@@ -396,12 +440,17 @@ export default function Home() {
                             <Label>Application Criterion</Label>
                             <Select
                               value={leaveValues.criterion.toString()}
-                              onValueChange={(selected) =>
+                              onValueChange={(selected) => {
                                 setFieldValue(
                                   `${section.key}.criterion`,
                                   Number(selected)
                                 )
-                              }
+                                setFieldTouched(
+                                  `${section.key}.criterion`,
+                                  true,
+                                  false
+                                )
+                              }}
                             >
                               <SelectTrigger>
                                 <SelectValue placeholder="Select criterion" />
@@ -453,91 +502,80 @@ export default function Home() {
 
               </Form>
 
-              <div className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Current Snapshot</CardTitle>
-                    <CardDescription>
-                      Raw vs. effective attendance with leaves excluded from
-                      attended classes until eligible.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm text-muted-foreground">
-                        Raw Attendance
-                      </p>
-                      <p className="text-xl font-semibold">
-                        {currentPercentage.toFixed(2)}%
-                      </p>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm text-muted-foreground">
-                        Effective Attendance
-                      </p>
-                      <p className="text-xl font-semibold">
-                        {effectivePercentage.toFixed(2)}%
-                      </p>
-                    </div>
-                    <div className="rounded-lg bg-muted/50 p-3">
-                      <p className="text-sm font-medium">
-                        Leaves Applied Right Now
-                      </p>
-                      <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                        <li>
-                          Medical: {medicalApplied} of{" "}
-                          {values.medicalLeaves.leaves}
-                        </li>
-                        <li>
-                          Duty: {dutyApplied} of {values.dutyLeaves.leaves}
-                        </li>
-                      </ul>
-                    </div>
-                  </CardContent>
-                </Card>
+              {isValid ? (
+                <div className="space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Current Snapshot</CardTitle>
+                      <CardDescription>
+                        Raw vs. effective attendance with leaves excluded from
+                        attended classes until eligible.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm text-muted-foreground">
+                          Raw Attendance
+                        </p>
+                        <p className="text-xl font-semibold">
+                          {currentPercentage.toFixed(2)}%
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm text-muted-foreground">
+                          Effective Attendance
+                        </p>
+                        <p
+                          className={`text-xl font-semibold ${effectiveAttendanceColor}`}
+                        >
+                          {effectivePercentage.toFixed(2)}%
+                        </p>
+                      </div>
+                      <div className="rounded-lg bg-muted/50 p-3">
+                        <p className="text-sm font-medium">
+                          Leaves Applied Right Now
+                        </p>
+                        <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                          <li>
+                            Medical: {medicalApplied} of{" "}
+                            {values.medicalLeaves.leaves}
+                          </li>
+                          <li>
+                            Duty: {dutyApplied} of {values.dutyLeaves.leaves}
+                          </li>
+                        </ul>
+                      </div>
+                    </CardContent>
+                  </Card>
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle>What&apos;s Next?</CardTitle>
-                    <CardDescription>
-                      Classes you must attend continuously or can afford to bunk
-                      while staying at your goal.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="rounded-lg border p-4">
-                      <p className="text-sm font-medium text-muted-foreground">
-                        Need to Attend
-                      </p>
-                      <p className="text-3xl font-bold">
-                        {classesToAttend}{" "}
-                        <span className="text-base font-medium text-muted-foreground">
-                          classes
-                        </span>
-                      </p>
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        Consecutive classes required to meet {values.targetPercentage}
-                        % target with current leave allowances.
-                      </p>
-                    </div>
-                    <div className="rounded-lg border p-4">
-                      <p className="text-sm font-medium text-muted-foreground">
-                        Safe to Bunk
-                      </p>
-                      <p className="text-3xl font-bold">
-                        {classesToBunk}{" "}
-                        <span className="text-base font-medium text-muted-foreground">
-                          classes
-                        </span>
-                      </p>
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        Maximum classes you can skip without dropping below{" "}
-                        {values.targetPercentage}%.
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>What&apos;s Next?</CardTitle>
+                      <CardDescription>
+                        Actionable guidance based on your current attendance.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div
+                        className={`rounded-lg border p-4 ${cardBorder}`}
+                      >
+                        <p className="text-sm font-medium text-muted-foreground">
+                          {cardTitle}
+                        </p>
+                        <p className={`text-3xl font-bold ${cardValueColor}`}>
+                          {cardValue}{" "}
+                          <span className="text-base font-medium text-muted-foreground">
+                            classes
+                          </span>
+                        </p>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          {cardDescription}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              ) : null}
             </div>
           )
         }}
