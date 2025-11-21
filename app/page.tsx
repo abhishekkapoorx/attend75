@@ -241,21 +241,37 @@ export default function Home() {
                   values.attendedClasses
               )
             : 0
-          const medicalResult = getAppliedLeaves(
-            values.medicalLeaves,
-            currentPercentage,
-            rawBelowTarget,
-            rawDeficit
-          )
-          const dutyResult = getAppliedLeaves(
-            values.dutyLeaves,
-            currentPercentage,
-            rawBelowTarget,
-            medicalResult.remainingGap
-          )
+          const leaveProcessingOrder: LeaveKey[] = [
+            "medicalLeaves",
+            "dutyLeaves",
+          ]
+          const orderedKeys = [
+            ...leaveProcessingOrder.filter(
+              (key) => values[key].criterion === 0
+            ),
+            ...leaveProcessingOrder.filter(
+              (key) => values[key].criterion !== 0
+            ),
+          ]
+          let remainingGap = rawDeficit
+          const appliedLeaves: Record<LeaveKey, number> = {
+            medicalLeaves: 0,
+            dutyLeaves: 0,
+          }
 
-          const medicalApplied = medicalResult.applied
-          const dutyApplied = dutyResult.applied
+          orderedKeys.forEach((key) => {
+            const result = getAppliedLeaves(
+              values[key],
+              currentPercentage,
+              rawBelowTarget,
+              remainingGap
+            )
+            appliedLeaves[key] = result.applied
+            remainingGap = result.remainingGap
+          })
+
+          const medicalApplied = appliedLeaves.medicalLeaves
+          const dutyApplied = appliedLeaves.dutyLeaves
           const totalAppliedLeaves = medicalApplied + dutyApplied
           const effectiveAttended = values.attendedClasses + totalAppliedLeaves
           const effectivePercentage =
