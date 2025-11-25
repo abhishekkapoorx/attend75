@@ -182,12 +182,80 @@ function getRequiredAttendanceDelta(
           Math.ceil((target * totalClasses - effectiveAttended) / (1 - target))
         )
 
-  const classesToBunk = Math.max(
-    0,
-    Math.floor(effectiveAttended / target - totalClasses)
-  )
+  // Fixed safe-to-bunk calculation
+  const classesToBunk = current > target 
+    ? Math.floor((effectiveAttended - target * totalClasses) / target)
+    : 0
 
   return { classesToAttend, classesToBunk }
+}
+
+// New function to calculate future projections and strategic recommendations
+function calculateAttendanceStrategy(
+  totalClasses: number,
+  attendedClasses: number,
+  targetPercentage: number,
+  medicalLeaves: LeaveConfig,
+  dutyLeaves: LeaveConfig
+) {
+  const target = targetPercentage / 100
+  const currentPercentage = totalClasses > 0 ? (attendedClasses / totalClasses) * 100 : 0
+  
+  // Calculate when leaves become available
+  const medicalUnlockClasses = medicalLeaves.criterion > 0 
+    ? Math.max(0, Math.ceil((medicalLeaves.criterion / 100) * totalClasses) - attendedClasses)
+    : 0
+    
+  const dutyUnlockClasses = dutyLeaves.criterion > 0 
+    ? Math.max(0, Math.ceil((dutyLeaves.criterion / 100) * totalClasses) - attendedClasses)
+    : 0
+
+  // Calculate total potential leaves
+  const totalPotentialLeaves = medicalLeaves.leaves + dutyLeaves.leaves
+  
+  // Calculate attendance needed with all leaves applied
+  const maxEffectiveAttended = attendedClasses + totalPotentialLeaves
+  const classesNeededWithAllLeaves = Math.max(0, 
+    Math.ceil(target * totalClasses) - maxEffectiveAttended
+  )
+
+  // Calculate safe bunking scenarios
+  const currentSafeBunk = currentPercentage > targetPercentage 
+    ? Math.floor((attendedClasses - target * totalClasses) / target)
+    : 0
+
+  const safeBunkWithCurrentLeaves = (() => {
+    // Apply currently available leaves
+    let appliedLeaves = 0
+    if (currentPercentage >= medicalLeaves.criterion) {
+      appliedLeaves += medicalLeaves.leaves
+    }
+    if (currentPercentage >= dutyLeaves.criterion) {
+      appliedLeaves += dutyLeaves.leaves
+    }
+    
+    const effectiveWithCurrent = attendedClasses + appliedLeaves
+    const currentEffectivePercentage = (effectiveWithCurrent / totalClasses) * 100
+    
+    return currentEffectivePercentage > targetPercentage
+      ? Math.floor((effectiveWithCurrent - target * totalClasses) / target)
+      : 0
+  })()
+
+  const safeBunkWithAllLeaves = maxEffectiveAttended > target * totalClasses
+    ? Math.floor((maxEffectiveAttended - target * totalClasses) / target)
+    : 0
+
+  return {
+    medicalUnlockClasses,
+    dutyUnlockClasses,
+    classesNeededWithAllLeaves,
+    currentSafeBunk,
+    safeBunkWithCurrentLeaves,
+    safeBunkWithAllLeaves,
+    totalPotentialLeaves,
+    maxEffectiveAttended
+  }
 }
 
 export default function Home() {
@@ -284,24 +352,34 @@ export default function Home() {
             effectiveAttended,
             values.targetPercentage
           )
+
+          const strategy = calculateAttendanceStrategy(
+            values.totalClasses,
+            values.attendedClasses,
+            values.targetPercentage,
+            values.medicalLeaves,
+            values.dutyLeaves
+          )
+
           const effectiveAttendanceColor =
             effectivePercentage >= values.targetPercentage
               ? "text-emerald-500"
               : "text-destructive"
+          
+          // Enhanced card logic with strategic recommendations
           const isAttendCard = classesToAttend > 0
-          const cardValue = isAttendCard ? classesToAttend : classesToBunk
+          const cardValue = isAttendCard ? classesToAttend : Math.max(classesToBunk, strategy.safeBunkWithCurrentLeaves)
           const cardTitle = isAttendCard ? "Need to Attend" : "Safe to Bunk"
           const cardBorder = isAttendCard
             ? "border-red-500/40 bg-red-500/10"
             : "border-green-500/40 bg-green-500/10"
           const cardValueColor = isAttendCard ? "text-red-500" : "text-green-500"
+          
           const cardDescription = isAttendCard
-            ? `Attend ${cardValue} more class${
-                cardValue === 1 ? "" : "es"
-              } consecutively to hit ${values.targetPercentage}%.`
-            : `You can safely skip ${cardValue} class${
-                cardValue === 1 ? "" : "es"
-              } without falling below ${values.targetPercentage}%.`
+            ? strategy.classesNeededWithAllLeaves < classesToAttend
+              ? `Attend ${strategy.classesNeededWithAllLeaves} more classes to reach ${values.targetPercentage}% with all leaves applied.`
+              : `Attend ${cardValue} more class${cardValue === 1 ? "" : "es"} consecutively to hit ${values.targetPercentage}%.`
+            : `You can safely skip ${cardValue} class${cardValue === 1 ? "" : "es"} without falling below ${values.targetPercentage}%.`
 
           return (
             <div className="grid gap-6 lg:grid-cols-[3fr,2fr]">
@@ -587,6 +665,76 @@ export default function Home() {
                         <p className="mt-2 text-sm text-muted-foreground">
                           {cardDescription}
                         </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Strategic Insights Card */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Strategic Insights</CardTitle>
+                      <CardDescription>
+                        Future projections and leave optimization tips.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* Leave Unlock Information */}
+                      {(strategy.medicalUnlockClasses > 0 || strategy.dutyUnlockClasses > 0) && (
+                        <div className="rounded-lg bg-blue-50 border border-blue-200 p-3">
+                          <p className="text-sm font-medium text-blue-900 mb-2">
+                            🔓 Unlock More Leaves
+                          </p>
+                          <ul className="text-sm text-blue-800 space-y-1">
+                            {strategy.medicalUnlockClasses > 0 && (
+                              <li>
+                                Attend {strategy.medicalUnlockClasses} more classes to unlock {values.medicalLeaves.leaves} medical leaves
+                              </li>
+                            )}
+                            {strategy.dutyUnlockClasses > 0 && (
+                              <li>
+                                Attend {strategy.dutyUnlockClasses} more classes to unlock {values.dutyLeaves.leaves} duty leaves
+                              </li>
+                            )}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Optimal Strategy */}
+                      {strategy.classesNeededWithAllLeaves !== classesToAttend && strategy.classesNeededWithAllLeaves >= 0 && (
+                        <div className="rounded-lg bg-green-50 border border-green-200 p-3">
+                          <p className="text-sm font-medium text-green-900 mb-2">
+                            💡 Optimal Strategy
+                          </p>
+                          <p className="text-sm text-green-800">
+                            With all leaves applied, you only need to attend {strategy.classesNeededWithAllLeaves} more classes to maintain {values.targetPercentage}%
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Future Safe Bunking */}
+                      {strategy.safeBunkWithAllLeaves > strategy.safeBunkWithCurrentLeaves && (
+                        <div className="rounded-lg bg-yellow-50 border border-yellow-200 p-3">
+                          <p className="text-sm font-medium text-yellow-900 mb-2">
+                            🎯 Future Bunking Potential
+                          </p>
+                          <p className="text-sm text-yellow-800">
+                            After unlocking all leaves, you could safely bunk up to {strategy.safeBunkWithAllLeaves} classes 
+                            (currently {strategy.safeBunkWithCurrentLeaves})
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Current Status Summary */}
+                      <div className="rounded-lg bg-gray-50 border border-gray-200 p-3">
+                        <p className="text-sm font-medium text-gray-900 mb-2">
+                          📊 Quick Summary
+                        </p>
+                        <div className="grid grid-cols-2 gap-2 text-xs text-gray-700">
+                          <div>Total Potential Leaves: {strategy.totalPotentialLeaves}</div>
+                          <div>Max Effective Attendance: {((strategy.maxEffectiveAttended / values.totalClasses) * 100).toFixed(1)}%</div>
+                          <div>Classes to Target: {Math.max(0, Math.ceil((values.targetPercentage / 100) * values.totalClasses) - values.attendedClasses)}</div>
+                          <div>Missed Classes: {Math.max(0, values.totalClasses - values.attendedClasses)}</div>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
