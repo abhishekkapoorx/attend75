@@ -1,0 +1,78 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="1200" height="630" fill="#0F172A"/>
+  
+  <!-- Gradient overlay -->
+  <defs>
+    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1E40AF;stop-opacity:0.3" />
+      <stop offset="50%" style="stop-color:#7C3AED;stop-opacity:0.2" />
+      <stop offset="100%" style="stop-color:#059669;stop-opacity:0.3" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#gradient)"/>
+  
+  <!-- Main content container -->
+  <g transform="translate(80, 120)">
+    <!-- Logo/Brand -->
+    <text x="0" y="60" font-family="system-ui, -apple-system, sans-serif" font-size="48" font-weight="bold" fill="#3B82F6">
+      attend75
+    </text>
+    
+    <!-- Main title -->
+    <text x="0" y="120" font-family="system-ui, -apple-system, sans-serif" font-size="36" font-weight="600" fill="#F8FAFC">
+      Smart Attendance Calculator
+    </text>
+    
+    <!-- Subtitle -->
+    <text x="0" y="170" font-family="system-ui, -apple-system, sans-serif" font-size="24" fill="#CBD5E1">
+      Strategic leave management &amp; safe bunking calculator
+    </text>
+    
+    <!-- Features list -->
+    <g transform="translate(0, 220)">
+      <!-- Feature 1 -->
+      <g>
+        <circle cx="12" cy="12" r="6" fill="#10B981"/>
+        <text x="30" y="18" font-family="system-ui, -apple-system, sans-serif" font-size="20" fill="#E2E8F0">
+          Calculate safe bunking with medical &amp; duty leaves
+        </text>
+      </g>
+      
+      <!-- Feature 2 -->
+      <g transform="translate(0, 40)">
+        <circle cx="12" cy="12" r="6" fill="#10B981"/>
+        <text x="30" y="18" font-family="system-ui, -apple-system, sans-serif" font-size="20" fill="#E2E8F0">
+          Get strategic insights for optimal attendance
+        </text>
+      </g>
+      
+      <!-- Feature 3 -->
+      <g transform="translate(0, 80)">
+        <circle cx="12" cy="12" r="6" fill="#10B981"/>
+        <text x="30" y="18" font-family="system-ui, -apple-system, sans-serif" font-size="20" fill="#E2E8F0">
+          Future projections &amp; leave unlock predictions
+        </text>
+      </g>
+    </g>
+    
+    <!-- Call to action -->
+    <text x="0" y="420" font-family="system-ui, -apple-system, sans-serif" font-size="18" fill="#94A3B8">
+      Built for students who want to attend smartly, not just frequently
+    </text>
+  </g>
+  
+  <!-- Decorative elements -->
+  <g opacity="0.1">
+    <!-- Grid pattern -->
+    <defs>
+      <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#F8FAFC" stroke-width="1"/>
+      </pattern>
+    </defs>
+    <rect width="1200" height="630" fill="url(#grid)"/>
+  </g>
+  
+  <!-- Bottom accent -->
+  <rect x="0" y="580" width="1200" height="50" fill="url(#gradient)" opacity="0.5"/>
+</svg>
