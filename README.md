@@ -1,9 +1,101 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 📚 Attend75 - Smart Attendance Calculator
 
-## Getting Started
+A comprehensive attendance management tool that helps students strategically plan their class attendance while considering medical leaves (ML) and duty leaves (DL) to maintain their target attendance percentage.
 
-First, run the development server:
+## 🌟 Features
 
+### Core Functionality
+- **Real-time Attendance Tracking**: Calculate current attendance percentage
+- **Target-based Planning**: Set and maintain your desired attendance percentage
+- **Smart Leave Management**: Handle medical and duty leaves with configurable criteria
+- **Strategic Recommendations**: Get actionable insights on when to attend or skip classes
+
+### Advanced Capabilities
+- **Safe-to-Bunk Calculator**: Know exactly how many classes you can safely skip
+- **Future Projections**: See when your leaves will become available
+- **Optimal Strategy Planning**: Get the most efficient path to your target percentage
+- **Leave Unlock Predictions**: Know how many classes to attend before leaves apply
+
+## 🧮 Logic & Calculations
+
+### Attendance Calculation Logic
+
+#### Basic Attendance Formula
+```
+Current Attendance % = (Attended Classes / Total Classes) × 100
+```
+
+#### Effective Attendance with Leaves
+```
+Effective Attendance % = ((Attended Classes + Applied Leaves) / Total Classes) × 100
+```
+
+### Leave Application Logic
+
+#### Medical Leaves
+- **Criterion-based**: Only applied when current attendance ≥ specified criterion
+- **Smart Application**: Can be set to "only required" mode to use leaves efficiently
+- **Strategic Timing**: Applied only when needed to reach target percentage
+
+#### Duty Leaves
+- **Immediate Application**: Can be set to apply immediately (criterion = 0%)
+- **Flexible Criteria**: Can be configured with attendance thresholds
+- **Boost Calculation**: Applied outside attended classes to boost percentage
+
+### Safe-to-Bunk Calculation
+
+#### Current Formula (Fixed)
+```typescript
+const classesToBunk = current > target 
+  ? Math.floor((effectiveAttended - target * totalClasses) / target)
+  : 0
+```
+
+#### Strategic Bunking Logic
+1. **Current Safe Bunk**: Based on current attendance without leaves
+2. **Safe Bunk with Current Leaves**: Considering currently available leaves
+3. **Safe Bunk with All Leaves**: Maximum potential after all leaves unlock
+
+### Future Projections
+
+#### Leave Unlock Calculation
+```typescript
+const unlockClasses = criterion > 0 
+  ? Math.max(0, Math.ceil((criterion / 100) * totalClasses) - attendedClasses)
+  : 0
+```
+
+#### Optimal Attendance Strategy
+```typescript
+const classesNeededWithAllLeaves = Math.max(0, 
+  Math.ceil(target * totalClasses) - (attendedClasses + totalPotentialLeaves)
+)
+```
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js 18+ 
+- npm, yarn, pnpm, or bun
+
+### Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/abhishekkapoorx/attend75.git
+cd attend75
+```
+
+2. Install dependencies:
+```bash
+npm install
+# or
+yarn install
+# or
+pnpm install
+```
+
+3. Run the development server:
 ```bash
 npm run dev
 # or
@@ -14,23 +106,96 @@ pnpm dev
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+4. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 💡 How to Use
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Step 1: Enter Basic Information
+- **Total Classes**: Total number of classes conducted so far
+- **Attended Classes**: Number of classes you have attended
+- **Target Percentage**: Your desired attendance percentage (e.g., 75%)
 
-## Learn More
+### Step 2: Configure Leave Settings
+- **Medical Leaves**: Set number of leaves and application criterion
+- **Duty Leaves**: Configure duty leave count and when they apply
+- **Only Required Toggle**: Use leaves only when needed to reach target
 
-To learn more about Next.js, take a look at the following resources:
+### Step 3: Get Strategic Insights
+- **Current Status**: View raw vs effective attendance
+- **Action Plan**: See whether to attend more classes or if you can safely bunk
+- **Future Projections**: Understand when leaves will unlock and optimal strategy
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🎯 Use Cases
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Scenario 1: Below Target
+- **Situation**: 60% attendance, need 75%
+- **Recommendation**: Shows exact classes to attend
+- **Strategy**: Displays when medical leaves will unlock
 
-## Deploy on Vercel
+### Scenario 2: At Risk
+- **Situation**: 73% attendance, target 75%
+- **Recommendation**: Strategic use of available leaves
+- **Strategy**: Optimal path to maintain target
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Scenario 3: Above Target
+- **Situation**: 80% attendance, target 75%
+- **Recommendation**: Safe bunking calculations
+- **Strategy**: Maximum classes that can be skipped
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 🛠️ Technical Stack
+
+- **Framework**: Next.js 14 with App Router
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS
+- **UI Components**: shadcn/ui
+- **Form Handling**: Formik with Yup validation
+- **Deployment**: Vercel
+
+## 🔧 Key Algorithms
+
+### Enhanced Safe-to-Bunk Algorithm
+The application uses a mathematically correct formula that considers:
+- Current effective attendance (including applied leaves)
+- Target percentage requirements
+- Future class projections
+- Leave availability and criteria
+
+### Strategic Leave Application
+Leaves are applied in optimal order:
+1. **Immediate leaves** (criterion = 0%) applied first
+2. **Criterion-based leaves** applied when eligible
+3. **Only-required leaves** used strategically to minimize waste
+
+### Future Projection Engine
+Calculates multiple scenarios:
+- Classes needed to unlock each leave type
+- Optimal attendance path with all leaves
+- Maximum safe bunking potential
+- Strategic recommendations based on current status
+
+## 📊 Example Calculations
+
+### Test Case: Strategic Planning
+```
+Input:
+- Total Classes: 100
+- Attended: 72
+- Target: 75%
+- Medical Leaves: 5 (criterion: 70%)
+- Duty Leaves: 2 (criterion: 0%)
+
+Output:
+- Current: 72% ✅ (above medical criterion)
+- Effective: 79% (72 + 5 + 2 = 79)
+- Safe to Bunk: 5 classes
+- Strategy: All leaves applied, can safely skip classes
+```
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📄 License
+
+This project is open source and available under the [MIT License](LICENSE).
+
