@@ -3,6 +3,7 @@
 
 import { Formik, Form, type FormikErrors } from "formik"
 import * as Yup from "yup"
+import { trackAttendanceCalculation, trackLeaveConfiguration, trackSafeBunking } from "@/components/analytics"
 
 import {
   Card,
@@ -381,6 +382,22 @@ export default function Home() {
               : `Attend ${cardValue} more class${cardValue === 1 ? "" : "es"} consecutively to hit ${values.targetPercentage}%.`
             : `You can safely skip ${cardValue} class${cardValue === 1 ? "" : "es"} without falling below ${values.targetPercentage}%.`
 
+          // Track analytics when valid calculations are made
+          if (isValid && values.totalClasses > 0) {
+            // Track attendance calculation
+            trackAttendanceCalculation({
+              totalClasses: values.totalClasses,
+              attendedClasses: values.attendedClasses,
+              targetPercentage: values.targetPercentage,
+              hasLeaves: values.medicalLeaves.leaves > 0 || values.dutyLeaves.leaves > 0
+            })
+
+            // Track safe bunking if applicable
+            if (!isAttendCard && cardValue > 0) {
+              trackSafeBunking(cardValue)
+            }
+          }
+
           return (
             <div className="grid gap-6 lg:grid-cols-[3fr,2fr]">
               <Form className="space-y-6">
@@ -516,12 +533,19 @@ export default function Home() {
                               min={0}
                               value={leaveValues.leaves}
                               onBlur={handleBlur}
-                              onChange={(event) =>
-                                setFieldValue(
-                                  `${section.key}.leaves`,
-                                  Number(event.target.value) || 0
-                                )
-                              }
+                              onChange={(event) => {
+                                const newValue = Number(event.target.value) || 0
+                                setFieldValue(`${section.key}.leaves`, newValue)
+                                
+                                // Track leave configuration
+                                if (newValue > 0) {
+                                  trackLeaveConfiguration(
+                                    section.key === 'medicalLeaves' ? 'medical' : 'duty',
+                                    newValue,
+                                    leaveValues.criterion
+                                  )
+                                }
+                              }}
                             />
                             {leaveTouched?.leaves && leaveErrors?.leaves ? (
                               <p className="text-sm text-destructive">
@@ -535,15 +559,18 @@ export default function Home() {
                             <Select
                               value={leaveValues.criterion.toString()}
                               onValueChange={(selected) => {
-                                setFieldValue(
-                                  `${section.key}.criterion`,
-                                  Number(selected)
-                                )
-                                setFieldTouched(
-                                  `${section.key}.criterion`,
-                                  true,
-                                  false
-                                )
+                                const newCriterion = Number(selected)
+                                setFieldValue(`${section.key}.criterion`, newCriterion)
+                                setFieldTouched(`${section.key}.criterion`, true, false)
+                                
+                                // Track criterion configuration
+                                if (leaveValues.leaves > 0) {
+                                  trackLeaveConfiguration(
+                                    section.key === 'medicalLeaves' ? 'medical' : 'duty',
+                                    leaveValues.leaves,
+                                    newCriterion
+                                  )
+                                }
                               }}
                             >
                               <SelectTrigger>
